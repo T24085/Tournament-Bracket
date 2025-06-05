@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -171,7 +132,7 @@
               <button
                 onClick={() => onSubmitScores(roundIndex, matchIndex, 'submit', null)}
                 className="mt-2 bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-sm"
-                disabled={match.score1 === undefined || match.score2 === undefined || match.score1 === '' || match.score2 === ''}
+                disabled={match.score1 === undefined || match.score2 === undefined || match.score1 === '' || match.score2 === '' || match.score1 === match.score2}
               >
                 Submit
               </button>
@@ -325,7 +286,7 @@
                         <button
                           onClick={() => onSubmitScores(roundIndex, matchIndex, 'submit', null)}
                           className="ml-4 bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-2 rounded"
-                          disabled={match.score1 === undefined || match.score2 === undefined || match.score1 === '' || match.score2 === ''}
+                          disabled={match.score1 === undefined || match.score2 === undefined || match.score1 === '' || match.score2 === '' || match.score1 === match.score2}
                         >
                           Submit Scores
                         </button>
@@ -351,15 +312,14 @@
     };
 
     const EliminationBracket = ({ rounds, onSubmitScores, tournamentStyle, teamRecords }) => {
-      const matchHeight = 80; // Height of each match box in pixels
-      const verticalSpacing = 20; // Space between matches in the same round
+      const matchHeight = 80;
+      const verticalSpacing = 20;
 
-      // Calculate positions for each match to draw connectors
-      const calculatePositions = () => {
+      const calculatePositions = (roundsToCalculate) => {
         const positions = [];
         let currentY = 0;
 
-        rounds.forEach((round, roundIndex) => {
+        roundsToCalculate.forEach((round, roundIndex) => {
           const roundPositions = [];
           const matchesInRound = round.length;
           const totalHeight = (matchesInRound * matchHeight) + ((matchesInRound - 1) * verticalSpacing);
@@ -377,21 +337,17 @@
         return positions;
       };
 
-      const positions = calculatePositions();
-
-      // Calculate next match positions for connectors
-      const getNextMatchPosition = (roundIndex, matchIndex) => {
-        if (roundIndex >= rounds.length - 1) return null;
-        const nextRound = rounds[roundIndex + 1];
+      const getNextMatchPosition = (roundIndex, matchIndex, roundsToCalculate, positions) => {
+        if (roundIndex >= roundsToCalculate.length - 1) return null;
+        const nextRound = roundsToCalculate[roundIndex + 1];
         const nextMatchIndex = Math.floor(matchIndex / 2);
         if (nextMatchIndex >= nextRound.length) return null;
         return positions[roundIndex + 1][nextMatchIndex] + (matchHeight / 2);
       };
 
-      // Calculate previous match positions for connectors
-      const getPrevMatchPositions = (roundIndex, matchIndex) => {
+      const getPrevMatchPositions = (roundIndex, matchIndex, roundsToCalculate, positions) => {
         if (roundIndex === 0) return [];
-        const prevRound = rounds[roundIndex - 1];
+        const prevRound = roundsToCalculate[roundIndex - 1];
         const prevMatches = [matchIndex * 2, matchIndex * 2 + 1].filter(idx => idx < prevRound.length);
         return prevMatches.map(idx => positions[roundIndex - 1][idx]);
       };
@@ -408,7 +364,6 @@
         return (
           <div className="glass-effect p-6 m-4">
             <h2 className="text-2xl font-bold mb-4">Double Elimination Tournament</h2>
-            {/* Display Team Records */}
             <div className="mb-8">
               <h3 className="text-lg font-bold mb-2">Team Overall Scores</h3>
               <div className="grid grid-cols-1 gap-2">
@@ -422,7 +377,6 @@
                   ))}
               </div>
             </div>
-            {/* Winners Bracket */}
             <h3 className="text-xl font-bold mb-4">Winners Bracket</h3>
             <div className="bracket-container">
               {winnersRounds.map((round, roundIndex) => (
@@ -447,7 +401,6 @@
                 </div>
               ))}
             </div>
-            {/* Losers Bracket */}
             {losersRounds.length > 0 && (
               <>
                 <h3 className="text-xl font-bold mb-4 mt-8">Losers Bracket</h3>
@@ -474,7 +427,6 @@
                 </div>
               </>
             )}
-            {/* Grand Final */}
             {finalRound.length > 0 && (
               <>
                 <h3 className="text-xl font-bold mb-4 mt-8">Grand Final</h3>
@@ -507,7 +459,6 @@
       return (
         <div className="glass-effect p-6 m-4">
           <h2 className="text-2xl font-bold mb-4">{tournamentStyle === 'singleElimination' ? 'Single Elimination Tournament' : 'Double Elimination Tournament'}</h2>
-          {/* Display Team Records */}
           <div className="mb-8">
             <h3 className="text-lg font-bold mb-2">Team Overall Scores</h3>
             <div className="grid grid-cols-1 gap-2">
@@ -783,6 +734,7 @@
         const matches = [];
         const teamCount = shuffledTeams.length;
 
+        // Generate all possible matchups
         for (let i = 0; i < teamCount; i++) {
           for (let j = i + 1; j < teamCount; j++) {
             matches.push({
@@ -795,13 +747,80 @@
           }
         }
 
-        const matchesPerRound = Math.ceil(teamCount / 2);
+        // Shuffle matches to randomize
+        const shuffledMatches = shuffleArray([...matches]);
         const rounds = [];
-        let matchIndex = 0;
-        while (matchIndex < matches.length) {
-          const roundMatches = matches.slice(matchIndex, matchIndex + matchesPerRound);
-          rounds.push(roundMatches);
-          matchIndex += matchesPerRound;
+        let remainingMatches = [...shuffledMatches];
+        let lastSetTeams = new Set();
+
+        // Step 1: Schedule the first set to include all teams (or as many as possible)
+        if (remainingMatches.length > 0) {
+          const firstRound = [];
+          const usedTeams = new Set();
+          const maxMatchesFirstRound = Math.floor(teamCount / 2);
+
+          // Pick matches for the first round
+          for (let i = 0; i < remainingMatches.length && firstRound.length < maxMatchesFirstRound; i++) {
+            const match = remainingMatches[i];
+            const team1Id = match.team1.id;
+            const team2Id = match.team2.id;
+
+            if (!usedTeams.has(team1Id) && !usedTeams.has(team2Id)) {
+              firstRound.push(match);
+              usedTeams.add(team1Id);
+              usedTeams.add(team2Id);
+            }
+          }
+
+          // Remove the matches we used from remainingMatches
+          remainingMatches = remainingMatches.filter(match => !firstRound.includes(match));
+          rounds.push(firstRound);
+
+          // Track teams that played in the first set
+          firstRound.forEach(match => {
+            lastSetTeams.add(match.team1.id);
+            lastSetTeams.add(match.team2.id);
+          });
+        }
+
+        // Step 2: Schedule remaining matches, ensuring no team plays in consecutive sets
+        while (remainingMatches.length > 0) {
+          const currentRound = [];
+          const usedTeamsThisRound = new Set();
+          const availableMatches = [];
+
+          // Find matches where neither team played in the last set
+          for (let i = 0; i < remainingMatches.length; i++) {
+            const match = remainingMatches[i];
+            const team1Id = match.team1.id;
+            const team2Id = match.team2.id;
+
+            if (!lastSetTeams.has(team1Id) && !lastSetTeams.has(team2Id) && !usedTeamsThisRound.has(team1Id) && !usedTeamsThisRound.has(team2Id)) {
+              currentRound.push(match);
+              usedTeamsThisRound.add(team1Id);
+              usedTeamsThisRound.add(team2Id);
+            } else {
+              availableMatches.push(match);
+            }
+          }
+
+          // Update remaining matches
+          remainingMatches = availableMatches;
+
+          // If we scheduled any matches, add the round
+          if (currentRound.length > 0) {
+            rounds.push(currentRound);
+            lastSetTeams.clear();
+            currentRound.forEach(match => {
+              lastSetTeams.add(match.team1.id);
+              lastSetTeams.add(match.team2.id);
+            });
+          } else if (remainingMatches.length > 0) {
+            // If we couldn't schedule any matches without breaking the consecutive rule,
+            // allow teams to play by resetting the lastSetTeams (relax the constraint)
+            lastSetTeams.clear();
+            continue;
+          }
         }
 
         const standings = {};
@@ -1207,7 +1226,7 @@
               }
 
               if (newMatches.length > 0) {
-                const matchesPerRound = Math.ceil(allTeams.length / 2);
+                const matchesPerRound = Math.floor(allTeams.length / 2);
                 let matchIndex = 0;
                 while (matchIndex < newMatches.length) {
                   const roundMatches = newMatches.slice(matchIndex, matchIndex + matchesPerRound);
